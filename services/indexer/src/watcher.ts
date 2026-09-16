@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Server } from '@stellar/stellar-sdk/rpc';
+import { Server, type Api } from '@stellar/stellar-sdk/rpc';
 import {
   DATABASE_TABLES,
   INDEXER_DEFAULTS,
@@ -23,6 +23,32 @@ const PAGE_LIMIT = INDEXER_DEFAULTS.pageLimit;
 
 /** Checkpoint stream id for the observed vault's event log. */
 export const EVENTS_STREAM = INDEXER_EVENTS_STREAM;
+
+/**
+ * Build a `getEvents` request for either the first or a subsequent page.
+ *
+ * `cursor` and `startLedger` are mutually exclusive on the RPC. A cold start has
+ * no cursor to resume from, and there is no "from the tip" cursor: the previous
+ * code passed the literal `'now'`, which the RPC rejects with `invalid event id
+ * now`, so a fresh indexer ingested nothing at all. It starts from an explicit
+ * ledger instead.
+ */
+export function buildEventsRequest(
+  cursor: string | null,
+  startLedger: number,
+  contractId: string,
+): Api.GetEventsRequest {
+  const filters = [
+    {
+      type: INDEXER_DEFAULTS.contractEventType,
+      contractIds: [contractId],
+    },
+  ];
+
+  return cursor === null
+    ? { startLedger, filters, limit: PAGE_LIMIT }
+    : { cursor, filters, limit: PAGE_LIMIT };
+}
 
 /**
  * Persist a decoded batch.
@@ -80,7 +106,7 @@ export async function startWatcher(): Promise<void> {
   const checkpoint = supabase
     ? await loadCheckpoint(supabase, EVENTS_STREAM)
     : null;
-  let cursor = checkpoint?.cursor ?? 'now';
+  let cursor: string | null = checkpoint?.cursor ?? null;
   let lastLedger = checkpoint?.lastLedger ?? 0;
 
   if (checkpoint) {
@@ -88,8 +114,11 @@ export async function startWatcher(): Promise<void> {
       `Resuming ${EVENTS_STREAM} from cursor ${cursor} (last ledger ${lastLedger}).`,
     );
   } else {
+    // With no checkpoint there is nothing to page from, so anchor on the
+    // ledger tip. `lastLedger` doubles as the first request's `startLedger`.
+    lastLedger = (await server.getLatestLedger()).sequence;
     console.log(
-      `No checkpoint stored for ${EVENTS_STREAM}; starting from the current ledger.`,
+      `No checkpoint stored for ${EVENTS_STREAM}; starting from ledger ${lastLedger}.`,
     );
   }
 
@@ -104,16 +133,9 @@ export async function startWatcher(): Promise<void> {
     inFlight = true;
 
     try {
-      const response = await server.getEvents({
-        cursor,
-        filters: [
-          {
-            type: INDEXER_DEFAULTS.contractEventType,
-            contractIds: [config.contractId],
-          },
-        ],
-        limit: PAGE_LIMIT,
-      });
+      const response = await server.getEvents(
+        buildEventsRequest(cursor, lastLedger, config.contractId),
+      );
 
       const decoded = response.events
         .map(decodeVaultEvent)

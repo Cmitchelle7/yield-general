@@ -102,5 +102,10 @@ jobs:
 
       # Catches a break in the artifact CI is expected to produce, since
       # `cargo test` compiles for the host rather than the wasm target.
+      #
+      # Same command as `pnpm run contract:build`, invoked directly: this job
+      # installs no Node toolchain on purpose, and reaching for pnpm here failed
+      # with `command not found` (exit 127) on the first CI run. Keeping the two
+      # in sync is on review; the script stays the entry point for humans.
       - name: Build deployment wasm
-        run: pnpm run contract:build
+        run: cargo build --manifest-path contracts/yield_vault/Cargo.toml --target wasm32-unknown-unknown --release

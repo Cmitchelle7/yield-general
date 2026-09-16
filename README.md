@@ -102,15 +102,22 @@ Currently, the API exposes the existing pool statistics and transaction history 
 
 ## Indexer Architecture
 
-`services/indexer` owns blockchain observation. The existing polling code now lives in `src/watcher.ts` and is started by `src/index.ts`.
+`services/indexer` owns blockchain observation. The polling code lives in `src/watcher.ts` and is started by `src/index.ts`.
 
-The planned indexer pipeline is:
+The pipeline is:
 
 ```text
-Stellar RPC -> watcher -> decoder -> processor -> handlers -> repositories/checkpoints -> database
+Stellar RPC -> watcher -> decoder -> repositories/checkpoints -> database
 ```
 
-Decoder, processor, handlers, checkpoints, and utility modules are structural boundaries only. The current watcher retains its early polling behavior and does not provide reliable checkpointing, complete event decoding, replay guarantees, deduplication, or production projections.
+Phase 2 implements the observation and persistence path:
+
+- `decoder.ts` decodes the Phase 1 contract's events into typed rows and ignores anything that is not a recognised vault event.
+- `checkpoints/checkpoint-store.ts` persists the RPC cursor, so the poller resumes after a restart instead of restarting from `now`.
+- `repositories/vault-repository.ts` upserts vault metadata and appends decoded events, deduplicating on the Soroban event id so a replay is idempotent.
+- `config.ts` reads the RPC, contract, and Supabase configuration.
+
+Still planned: a separate processor/handler split, reconciliation, and stronger replay guarantees. The watcher also retains a scaffold-only `pool_snapshots` write that the existing API route and dashboard still consume; replacing it with real vault state requires contract state reads (Phase 5).
 
 ## Frontend Architecture
 
@@ -126,14 +133,16 @@ The current screen and Freighter context were moved without introducing a new ro
 
 ## Database Architecture
 
-`database` is the future database ownership boundary:
+`database` owns the derived read model:
 
-- `migrations`: versioned schema changes.
+- `migrations`: versioned schema changes. `002_create_protocol_tables.sql` adds the Phase 2 `vaults`, `vault_events`, and `indexer_checkpoints` tables.
 - `seeds`: development and test data only.
 - `functions`: database-side functions when justified.
-- `schema`: reviewed schema definitions and supporting documentation.
+- `schema`: reviewed schema definitions and supporting documentation — see `database/schema/README.md`.
 
-The existing migration was moved from `services/api/migrations` to `database/migrations`. It defines the current scaffold's pool snapshot and transaction log tables. It is not a complete protocol schema and does not model vault shares, RWA instruments, compliance, strategy state, NAV, reserves, or governance.
+`001_create_tables.sql` holds the scaffold's pool snapshot and transaction log tables, which the existing API routes and dashboard still use. The schema remains incomplete: it does not model vault shares as a stored projection (they are derived from `vault_events`), RWA instruments, compliance, strategy state, NAV, reserves, or governance.
+
+Amounts are stored as `numeric(40,0)` because the contract accounts in `i128` base units. Queries cast those columns to `text` so a 128-bit amount is never coerced into a lossy JavaScript number.
 
 ## Data Authority Model
 
@@ -243,10 +252,11 @@ yieldanchor/
 - React, Vite, and TypeScript for the web application
 - Node.js, Express, and TypeScript for the API
 - Stellar RPC for blockchain observation
-- PostgreSQL/Supabase as the planned derived data store
+- PostgreSQL/Supabase as the derived data store for the Phase 2 projection
 - Freighter Wallet for user authorization
 - pnpm workspaces for JavaScript package boundaries
 - ESLint (flat config, TypeScript support) and Prettier for the TypeScript/JavaScript workspaces
+- Vitest for the `services/api` and `services/indexer` unit tests; Rust tests run through `cargo test`
 - rustfmt and clippy for Rust; Prettier never formats Rust sources
 
 The repository currently uses the pinned dependency versions in each application and service package. Shared packages do not have runtime implementations yet.
@@ -255,7 +265,7 @@ The repository currently uses the pinned dependency versions in each application
 
 1. Architecture and repository boundaries (Phase 0 complete).
 2. Core YieldVault contract, integer accounting, authorization, pause controls, simulated Testnet yield, and unit tests (Phase 1 complete).
-3. Database schema, migrations, repositories, and indexer checkpoints.
+3. Database schema, migrations, repositories, and indexer checkpoints (Phase 2 complete).
 4. Contract clients, shared types, validation, and Stellar utilities.
 5. Read-only API projections and frontend navigation.
 6. Vault lifecycle, share accounting, deposits, withdrawals, and transaction flows.
@@ -273,7 +283,10 @@ Each phase should add explicit tests and documentation before dependent features
 - Express API scaffold under `services/api`.
 - Existing read-oriented pool statistics and transaction routes.
 - Phase 1 Soroban `yield_vault` contract under `contracts/yield_vault`, including unit tests and Testnet-only simulated yield.
-- Existing RPC polling scaffold under `services/indexer/src/watcher.ts`.
+- Indexer path under `services/indexer`: event decoder, cursor checkpoint store, and write repositories, all unit tested. The watcher resumes from its stored checkpoint and deduplicates replayed events.
+- Phase 2 database projection under `database/migrations/002_create_protocol_tables.sql` (`vaults`, `vault_events`, `indexer_checkpoints`), documented in `database/schema/README.md`.
+- Read repositories for the vault projection under `services/api/src/repositories`. These are the data-access boundary only; they are not yet wired to routes.
+- Vitest test runners in the `services/api` and `services/indexer` workspaces, run by `pnpm test` alongside the contract tests.
 - Existing database migration moved to `database/migrations`.
 - Testnet deployment script moved to `scripts/deploy`.
 - Root workspace and development command boundaries.
@@ -283,15 +296,15 @@ Each phase should add explicit tests and documentation before dependent features
 - Vault factory and complete modular contract suite.
 - Production yield sources, RWA/Treasury Bill integrations, and production vault accounting beyond the Phase 1 simulation.
 - Contract clients and shared domain types.
-- Reliable event decoding, processing, checkpointing, replay, and reconciliation.
-- Complete API controllers, repositories, authentication, compliance, and analytics.
+- A dedicated indexer processor/handler split, reconciliation, and stronger replay guarantees.
+- API controllers, authentication, compliance, analytics, and wiring the Phase 2 read repositories to routes.
 - Dashboard, vault explorer, portfolio, RWA, transaction, compliance, settings, and admin workflows.
-- Database schema beyond the current scaffold tables.
+- Database schema beyond the Phase 2 vault projection (RWA, compliance, strategy, NAV, reserves).
 - Real RWA/Treasury Bill integrations, proof of reserves, NAV, governance, and mainnet deployment.
 
 ## Future Roadmap
 
-Phase 1 establishes and tests the core YieldVault boundary with a clearly labeled Testnet-only yield simulation. The next milestone is to specify the database/indexer projection and contract-client boundaries before integrating the vault into application workflows. Production yield, RWA/Treasury Bill integrations, and dependent features require separate design, security review, and later phases.
+Phase 1 establishes and tests the core YieldVault boundary with a clearly labeled Testnet-only yield simulation, and Phase 2 adds the database projection and indexer checkpointing that observe it. The next milestone is the contract-client and shared-type boundaries, before the vault is integrated into application workflows. Production yield, RWA/Treasury Bill integrations, and dependent features require separate design, security review, and later phases.
 
 No current scaffold should be used with production funds or interpreted as an investment product.
 
@@ -318,10 +331,16 @@ available script.
 ```bash
 pnpm run build        # typecheck + bundle apps/web, compile services/api and services/indexer
 pnpm run typecheck    # tsc --noEmit in every TypeScript workspace
+pnpm run test         # vitest for services/api and services/indexer, then the contract tests
+pnpm --filter @yieldanchor/indexer test:watch   # vitest in watch mode, one workspace at a time
 pnpm run lint         # ESLint over the TypeScript/JavaScript workspaces
 pnpm run format       # Prettier write
 pnpm run format:check # Prettier check (use in CI)
 ```
+
+The service test suites are unit tests. They use stubbed Supabase and RPC clients rather
+than a live database or network, so `pnpm run test` needs no credentials and no reachable
+Testnet.
 
 Run individual development processes from the repository root:
 

@@ -1,0 +1,111 @@
+# Continuous integration for the two halves of the repository.
+#
+# The checks mirror what a contributor runs locally, so a green pipeline and a
+# green local run mean the same thing. Both jobs are required to pass.
+#
+# Deliberately NOT run here:
+#   - `pnpm run testnet:*` — those scripts hit live Testnet, spend real fees, and
+#     need a funded account. Nothing in this workflow may depend on network
+#     access, a secret key, or a deployed contract.
+#   - Prettier/ESLint over `contracts/` — Rust is owned by rustfmt and clippy.
+#     `.prettierignore` and `eslint.config.mjs` already scope that boundary, and
+#     the contract job below is what enforces it.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to a branch supersedes the run in flight for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    name: TypeScript workspaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Runs before setup-node so the node cache can key off pnpm-lock.yaml.
+      # pnpm/action-setup reads the version from the `packageManager` field in
+      # package.json, so CI uses the same pinned pnpm as local development.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Consumers resolve compiled declarations, so packages/* must be built
+      # before anything that imports @yieldanchor/*. `typecheck` and `test` do
+      # this themselves, but doing it once here makes the dependency explicit and
+      # keeps the steps below order-independent.
+      - name: Build shared packages
+        run: pnpm run build:packages
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Test packages
+        run: pnpm run test:packages
+
+      - name: Test services
+        run: pnpm run test:workspaces
+
+      - name: Build applications and services
+        run: pnpm run build
+
+  contracts:
+    name: Soroban contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # `stable` rather than a pinned version: the repository carries no
+      # rust-toolchain.toml, so local development already follows stable. Add one
+      # (and pin it here) if reproducible builds become a requirement.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          # Needed to build the deployment wasm, and to compile the contract at
+          # all under the release profile the workspace declares.
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy -p yield_vault --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test -p yield_vault
+
+      # Catches a break in the artifact CI is expected to produce, since
+      # `cargo test` compiles for the host rather than the wasm target.
+      #
+      # Same command as `pnpm run contract:build`, invoked directly: this job
+      # installs no Node toolchain on purpose, and reaching for pnpm here failed
+      # with `command not found` (exit 127) on the first CI run. Keeping the two
+      # in sync is on review; the script stays the entry point for humans.
+      - name: Build deployment wasm
+        run: cargo build --manifest-path contracts/yield_vault/Cargo.toml --target wasm32-unknown-unknown --release

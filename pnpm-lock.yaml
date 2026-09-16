@@ -15,6 +15,18 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.10.0(jiti@1.21.7))
+      '@stellar/stellar-sdk':
+        specifier: 16.0.1
+        version: 16.0.1
+      '@types/node':
+        specifier: 20.4.2
+        version: 20.4.2
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:packages/constants
+      '@yieldanchor/contract-clients':
+        specifier: workspace:*
+        version: link:packages/contract-clients
       eslint:
         specifier: ^10.10.0
         version: 10.10.0(jiti@1.21.7)
@@ -24,6 +36,9 @@ importers:
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: 5.4.2
         version: 5.4.2

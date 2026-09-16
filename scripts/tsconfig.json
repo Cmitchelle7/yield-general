@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "display": "YieldAnchor developer tooling",
+  "//": "Type-checks the TypeScript under scripts/ only. These files are run by tsx, not compiled, so the module settings describe what tsx does rather than an emit target: no outDir, no declaration output, noEmit.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}

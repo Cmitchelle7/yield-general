@@ -19,8 +19,8 @@
     "build:web": "pnpm --filter @yieldanchor/web build",
     "build:api": "pnpm --filter @yieldanchor/api build",
     "build:indexer": "pnpm --filter @yieldanchor/indexer build",
-    "//typecheck": "Packages are compiled first so their declarations exist for apps/ and services/ to resolve.",
-    "typecheck": "pnpm run build:packages && pnpm -r run typecheck",
+    "//typecheck": "Packages are compiled first so their declarations exist for apps/ and services/ to resolve. scripts/ is type-checked separately: it is run through tsx rather than compiled as a workspace.",
+    "typecheck": "pnpm run build:packages && pnpm -r run typecheck && tsc -p scripts/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -38,13 +38,23 @@
     "contract:fmt": "cargo fmt --all",
     "contract:fmt:check": "cargo fmt --all -- --check",
     "contract:clippy": "cargo clippy -p yield_vault --all-targets -- -D warnings",
-    "contract:deploy": "bash scripts/deploy/deploy-yield-vault.sh"
+    "//contract:deploy": "Shell path: requires the stellar CLI on PATH and builds the wasm itself.",
+    "contract:deploy": "bash scripts/deploy/deploy-yield-vault.sh",
+    "//contract:deploy:ts": "TypeScript path: deploys through @yieldanchor/contract-clients, so packages and the wasm must be built first.",
+    "contract:deploy:ts": "pnpm run build:packages && pnpm run contract:build && tsx scripts/deploy/deploy-yield-vault.ts",
+    "//testnet:round-trip": "Live Testnet smoke test against the deployed vault. Spends Testnet fees.",
+    "testnet:round-trip": "pnpm run build:packages && tsx scripts/testnet/round-trip.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stellar/stellar-sdk": "16.0.1",
+    "@types/node": "20.4.2",
+    "@yieldanchor/constants": "workspace:*",
+    "@yieldanchor/contract-clients": "workspace:*",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
     "typescript": "5.4.2",
     "typescript-eslint": "^8.70.0"
   }

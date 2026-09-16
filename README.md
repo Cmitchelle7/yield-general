@@ -411,10 +411,38 @@ make contract-clippy      # cargo clippy -p yield_vault --all-targets -- -D warn
 make clean                # cargo clean
 ```
 
-Rust formatting and linting are owned by rustfmt and clippy; Prettier and ESLint
-do not format or lint `contracts/`. The deployment script under `scripts/deploy` is
-a Testnet-only development aid and initializes the Phase 1 metadata; it must be
-reviewed before any use.
+Rust formatting and linting are owned by rustfmt and clippy; Prettier and ESLint do
+not format or lint `contracts/`.
+
+### Testnet deployment
+
+Two equivalent paths deploy the same wasm. Both are Testnet-only development aids
+and neither is production-ready.
+
+```bash
+pnpm run contract:deploy:ts   # TypeScript, through @yieldanchor/contract-clients
+pnpm run contract:deploy      # shell script, requires the stellar CLI on PATH
+```
+
+The TypeScript path is preferred: it builds the packages, deploys through the same
+client the indexer and API use, initializes the vault, and verifies the result by
+reading it back. It generates a funded deployer on first use and keeps the key in
+`scripts/.deployer.json` (gitignored); inject `DEPLOYER_SECRET` instead in CI. Both
+paths record the outcome in `scripts/.contract_id`, and the shell path additionally
+refuses an underlying asset that is a Stellar account (`G...`) rather than a token
+contract (`C...`).
+
+A live smoke test then exercises the deployed vault end to end against real Testnet
+state:
+
+```bash
+pnpm run testnet:round-trip   # deposit, yield accrual, redemption
+```
+
+`scripts/` is type-checked by its own `tsconfig.json` rather than compiled as a
+workspace, so `pnpm run typecheck` covers it alongside the packages and services. See
+`docs/deployment/testnet.md` for the current deployment, what that round trip
+reported, and the Phase 1 limitations it exposes.
 
 ## Contribution Guidelines
 

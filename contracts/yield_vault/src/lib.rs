@@ -334,6 +334,14 @@ impl YieldVault {
         Ok(Self::accounting(&env)?.paused)
     }
 
+    /// Whether the vault has been initialized.
+    ///
+    /// This view cannot fail, so callers can tell "not initialized" apart from
+    /// a genuine read error on the other getters.
+    pub fn is_initialized(env: Env) -> bool {
+        env.storage().instance().has(&DataKey::Config)
+    }
+
     pub fn convert_to_shares(env: Env, assets: i128) -> Result<i128, VaultError> {
         if assets < 0 {
             return Err(VaultError::BadAmount);
@@ -690,6 +698,7 @@ mod test {
     fn initializes_metadata_and_empty_state() {
         let (env, vault, asset, admin, _, _) = setup();
         let client = YieldVaultClient::new(&env, &vault);
+        assert!(client.is_initialized());
         let state = client.get_vault_state();
         assert_eq!(state.admin, admin);
         assert_eq!(state.asset, asset);
@@ -726,6 +735,7 @@ mod test {
             .address();
         let fresh_vault = fresh.register_contract(None, YieldVault);
         let fresh_client = YieldVaultClient::new(&fresh, &fresh_vault);
+        assert!(!fresh_client.is_initialized());
         assert_eq!(
             fresh_client.try_initialize(
                 &fresh_admin,
@@ -884,6 +894,14 @@ mod test {
         let client = YieldVaultClient::new(&env, &vault);
         client.deposit(&alice, &100);
         assert_eq!(
+            client.try_redeem(&alice, &0),
+            Err(Ok(VaultError::BadAmount))
+        );
+        assert_eq!(
+            client.try_redeem(&alice, &-1),
+            Err(Ok(VaultError::BadAmount))
+        );
+        assert_eq!(
             client.try_redeem(&alice, &101),
             Err(Ok(VaultError::NoShares))
         );
@@ -941,7 +959,11 @@ mod test {
             Err(Ok(VaultError::Paused))
         );
         assert_eq!(client.try_redeem(&alice, &1), Err(Ok(VaultError::Paused)));
+        assert_eq!(client.try_withdraw(&alice, &1), Err(Ok(VaultError::Paused)));
         assert_eq!(client.try_accrue_yield(), Err(Ok(VaultError::Paused)));
+        // Pausing blocks mutations only; read-only views stay available.
+        assert_eq!(client.total_assets(), 0);
+        assert_eq!(client.total_shares(), 0);
         client.unpause();
         assert_eq!(client.try_unpause(), Err(Ok(VaultError::NotPaused)));
         assert!(!client.is_paused());

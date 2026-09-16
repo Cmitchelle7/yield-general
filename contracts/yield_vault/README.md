@@ -12,7 +12,7 @@ Implemented in this phase:
 - Integer-only accounting with checked arithmetic and explicit floor/ceiling rounding.
 - Admin pause/unpause controls.
 - Soroban address authorization for initialization, user operations, and admin operations.
-- Vault state, balance, conversion, share-price, and liquidity read methods.
+- Vault state, initialization, pause, balance, conversion, share-price, and liquidity read methods.
 - Initialization, deposit, withdrawal, share mint/burn, yield, and pause events.
 
 ## Simulated yield warning

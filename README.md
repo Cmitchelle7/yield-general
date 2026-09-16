@@ -2,7 +2,7 @@
 
 YieldAnchor is a Stellar-native architecture for future real-world-asset (RWA) yield infrastructure. The protocol is intended to connect tokenized asset strategies with transparent Soroban contracts, an indexing and API layer, and web interfaces for investors and institutions.
 
-This repository has completed Phase 0 architecture work and Phase 1 implementation of the core YieldVault contract. Phase 1's yield is a deterministic Testnet-only simulation; it is not real Treasury Bill/RWA yield and must not be used with production funds.
+This repository has completed Phase 0 architecture work, the Phase 1 core YieldVault contract, the Phase 2 database projection and indexer checkpointing, and the Phase 3 shared-package boundaries (contract clients, shared types, validation, Stellar utilities, constants). Phase 1's yield is a deterministic Testnet-only simulation; it is not real Treasury Bill/RWA yield and must not be used with production funds.
 
 ## Vision
 
@@ -93,6 +93,22 @@ The planned contract set is:
 - `mocks`: test-only assets and dependencies.
 
 The `contracts/yield_vault` crate now contains the Phase 1 core vault: asset-agnostic deposits, shares, redemption, withdrawals, checked integer accounting, pause controls, authorization, events, read-only views, and deterministic ledger-time simulation. The simulated yield is explicitly Testnet-only and is not an audited vault, real yield engine, Treasury Bill integration, RWA integration, oracle, strategy, NAV calculation, or production deployment. The other contract directories remain intentionally empty placeholders.
+
+## Shared Package Architecture
+
+`packages` holds the boundaries every other workspace depends on. Dependencies point one way, so there are no cycles:
+
+```text
+constants -> shared-types -> stellar-utils -> validation -> contract-clients
+```
+
+- `@yieldanchor/constants`: network passphrases and endpoints, the contract's event topics, the `VaultError` code map, the protocol parameters (including the simulated-yield denominators), database table and column names, and the indexer's ingestion defaults. It has no runtime dependencies. Its tests read `contracts/yield_vault/src/lib.rs` and fail if a topic, error code, or parameter drifts from the contract.
+- `@yieldanchor/shared-types`: the vault config/state/metadata types, decoded event types, database row shapes, and API DTOs. Amounts are `bigint` in the domain and decimal strings at transport boundaries, because `i128` does not survive a JavaScript `number` or a JSON encoder.
+- `@yieldanchor/stellar-utils`: exact integer helpers (`toNumericString`, `fromNumericString`, `toSafeNumber`, `mulDivTrunc`), base-unit/amount formatting, checksum-based address validation, defensive `ScVal` decoding, and ledger-time estimation.
+- `@yieldanchor/validation`: Zod schemas for account and contract addresses, base-unit and decimal amounts, the vault's entry-point inputs, and the indexer's environment configuration. Environment parsing reports problems and falls back to documented defaults rather than throwing, so a malformed `.env` cannot stop a service from booting.
+- `@yieldanchor/contract-clients`: `YieldVaultClient`, with simulated read-only calls decoded into shared types, transaction builders that return unsigned assembled transactions, and a sign-and-send path that takes an injected `signTransaction` function (the shape Freighter exposes). No secret key is read, stored, or accepted anywhere in this package.
+
+Each package is TypeScript, compiled to `dist/` by `tsc`. Consumers resolve the compiled declarations, so `pnpm run build:packages` runs first in the `typecheck`, `test`, and `build` scripts. The client is library-only in Phase 3: nothing in `apps/` or `services/` submits a transaction yet.
 
 ## Backend Architecture
 
@@ -204,12 +220,12 @@ yieldanchor/
 │   ├── fee_manager/            # Planned boundary
 │   ├── treasury/               # Planned boundary
 │   └── mocks/                  # Planned test-only boundary
-├── packages/
-│   ├── contract-clients/
-│   ├── shared-types/
-│   ├── stellar-utils/
-│   ├── validation/
-│   └── constants/
+├── packages/                   # Shared boundaries (Phase 3)
+│   ├── constants/              # Networks, event topics, error codes, table names
+│   ├── shared-types/           # Vault, event, row and DTO types
+│   ├── stellar-utils/          # Integer, amount, address, ScVal and ledger helpers
+│   ├── validation/             # Zod input and environment schemas
+│   └── contract-clients/       # Typed YieldVault client
 ├── database/
 │   ├── migrations/
 │   ├── seeds/
@@ -256,17 +272,18 @@ yieldanchor/
 - Freighter Wallet for user authorization
 - pnpm workspaces for JavaScript package boundaries
 - ESLint (flat config, TypeScript support) and Prettier for the TypeScript/JavaScript workspaces
-- Vitest for the `services/api` and `services/indexer` unit tests; Rust tests run through `cargo test`
+- Zod for the shared validation schemas in `packages/validation`
+- Vitest for the `packages/*`, `services/api`, and `services/indexer` unit tests; Rust tests run through `cargo test`
 - rustfmt and clippy for Rust; Prettier never formats Rust sources
 
-The repository currently uses the pinned dependency versions in each application and service package. Shared packages do not have runtime implementations yet.
+The repository currently uses the pinned dependency versions in each package. The five shared packages under `packages/` now have runtime implementations; each app and service consumes the compiled `dist/` output, so `pnpm run build:packages` runs before typechecking, testing, or building them.
 
 ## Development Phases
 
 1. Architecture and repository boundaries (Phase 0 complete).
 2. Core YieldVault contract, integer accounting, authorization, pause controls, simulated Testnet yield, and unit tests (Phase 1 complete).
 3. Database schema, migrations, repositories, and indexer checkpoints (Phase 2 complete).
-4. Contract clients, shared types, validation, and Stellar utilities.
+4. Contract clients, shared types, validation, and Stellar utilities (Phase 3 complete).
 5. Read-only API projections and frontend navigation.
 6. Vault lifecycle, share accounting, deposits, withdrawals, and transaction flows.
 7. Compliance, RWA registry, strategy controls, fees, treasury, and reconciliation.
@@ -286,7 +303,8 @@ Each phase should add explicit tests and documentation before dependent features
 - Indexer path under `services/indexer`: event decoder, cursor checkpoint store, and write repositories, all unit tested. The watcher resumes from its stored checkpoint and deduplicates replayed events.
 - Phase 2 database projection under `database/migrations/002_create_protocol_tables.sql` (`vaults`, `vault_events`, `indexer_checkpoints`), documented in `database/schema/README.md`.
 - Read repositories for the vault projection under `services/api/src/repositories`. These are the data-access boundary only; they are not yet wired to routes.
-- Vitest test runners in the `services/api` and `services/indexer` workspaces, run by `pnpm test` alongside the contract tests.
+- Phase 3 shared packages under `packages/`: protocol constants, shared domain and database types, Stellar/Soroban utilities, Zod validation schemas, and a typed YieldVault contract client. Each is unit tested, and `@yieldanchor/constants` checks its event topics, error codes and parameters against the contract's source.
+- Vitest test runners in every JavaScript workspace, run by `pnpm test` alongside the contract tests.
 - Existing database migration moved to `database/migrations`.
 - Testnet deployment script moved to `scripts/deploy`.
 - Root workspace and development command boundaries.
@@ -295,8 +313,8 @@ Each phase should add explicit tests and documentation before dependent features
 
 - Vault factory and complete modular contract suite.
 - Production yield sources, RWA/Treasury Bill integrations, and production vault accounting beyond the Phase 1 simulation.
-- Contract clients and shared domain types.
 - A dedicated indexer processor/handler split, reconciliation, and stronger replay guarantees.
+- Wiring the contract client and the read repositories into API routes and frontend flows (Phases 5 and 6).
 - API controllers, authentication, compliance, analytics, and wiring the Phase 2 read repositories to routes.
 - Dashboard, vault explorer, portfolio, RWA, transaction, compliance, settings, and admin workflows.
 - Database schema beyond the Phase 2 vault projection (RWA, compliance, strategy, NAV, reserves).
@@ -304,7 +322,7 @@ Each phase should add explicit tests and documentation before dependent features
 
 ## Future Roadmap
 
-Phase 1 establishes and tests the core YieldVault boundary with a clearly labeled Testnet-only yield simulation, and Phase 2 adds the database projection and indexer checkpointing that observe it. The next milestone is the contract-client and shared-type boundaries, before the vault is integrated into application workflows. Production yield, RWA/Treasury Bill integrations, and dependent features require separate design, security review, and later phases.
+Phase 1 establishes and tests the core YieldVault boundary with a clearly labeled Testnet-only yield simulation, Phase 2 adds the database projection and indexer checkpointing that observe it, and Phase 3 adds the shared boundaries the rest of the stack builds on: protocol constants, shared types, Stellar utilities, validation, and a typed contract client. The next milestone is wiring those boundaries into read-only API projections and frontend navigation; the vault is not yet integrated into any application workflow. Production yield, RWA/Treasury Bill integrations, and dependent features require separate design, security review, and later phases.
 
 No current scaffold should be used with production funds or interpreted as an investment product.
 
@@ -329,14 +347,21 @@ The daily workflow is driven by `pnpm` from the repository root. `pnpm run` list
 available script.
 
 ```bash
-pnpm run build        # typecheck + bundle apps/web, compile services/api and services/indexer
-pnpm run typecheck    # tsc --noEmit in every TypeScript workspace
-pnpm run test         # vitest for services/api and services/indexer, then the contract tests
+pnpm run build         # compile packages/*, then bundle apps/web and compile the services
+pnpm run build:packages # compile only packages/* (run this before typechecking a consumer)
+pnpm run typecheck     # compile packages/*, then tsc --noEmit in every workspace
+pnpm run test          # compile packages/*, then vitest in every JS workspace, then the contract tests
+pnpm run test:packages # vitest for packages/* only
 pnpm --filter @yieldanchor/indexer test:watch   # vitest in watch mode, one workspace at a time
-pnpm run lint         # ESLint over the TypeScript/JavaScript workspaces
-pnpm run format       # Prettier write
-pnpm run format:check # Prettier check (use in CI)
+pnpm run lint          # ESLint over the TypeScript/JavaScript workspaces
+pnpm run format        # Prettier write
+pnpm run format:check  # Prettier check (use in CI)
 ```
+
+Consumers import the packages' compiled output, so `pnpm run typecheck`, `pnpm run test`
+and `pnpm run build` all compile `packages/*` first. Running a single workspace's
+`typecheck` before the packages have ever been built will fail to resolve
+`@yieldanchor/*`; build the packages once and then iterate inside the workspace.
 
 The service test suites are unit tests. They use stubbed Supabase and RPC clients rather
 than a live database or network, so `pnpm run test` needs no credentials and no reachable

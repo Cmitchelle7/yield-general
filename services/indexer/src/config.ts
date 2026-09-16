@@ -1,13 +1,18 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { parseIndexerEnv, type EnvLike } from '@yieldanchor/validation';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const DEFAULT_RPC_URL = 'https://soroban-testnet.stellar.org:443';
-const PLACEHOLDER_VALUES = new Set([
-  'your_supabase_url_here',
-  'your_supabase_key_here',
-]);
+/**
+ * Indexer configuration.
+ *
+ * Resolution lives in `@yieldanchor/validation` so the fallbacks (Testnet RPC,
+ * "no vault yet", placeholder secrets treated as unconfigured) are tested
+ * there rather than re-implemented per service. An invalid value is reported
+ * and falls back to its default: a malformed `.env` must not stop the indexer
+ * from starting.
+ */
 
 export interface IndexerConfig {
   rpcUrl: string;
@@ -16,29 +21,20 @@ export interface IndexerConfig {
   supabaseKey: string | null;
 }
 
-function readSecret(raw: string | undefined): string | null {
-  const value = raw?.trim() ?? '';
-  if (value.length === 0 || PLACEHOLDER_VALUES.has(value)) {
-    return null;
-  }
-  return value;
-}
-
 /**
  * Read indexer configuration from an environment-like object.
  *
  * Taking the environment as an argument keeps this testable without mutating
  * `process.env` globally.
  */
-export function loadConfig(
-  env: NodeJS.ProcessEnv = process.env,
-): IndexerConfig {
-  return {
-    rpcUrl: env.SOROBAN_RPC?.trim() || DEFAULT_RPC_URL,
-    contractId: env.CONTRACT_ID?.trim() ?? '',
-    supabaseUrl: readSecret(env.SUPABASE_URL),
-    supabaseKey: readSecret(env.SUPABASE_KEY),
-  };
+export function loadConfig(env: EnvLike = process.env): IndexerConfig {
+  const { config, issues } = parseIndexerEnv(env);
+
+  for (const issue of issues) {
+    console.warn(`Indexer configuration: ${issue} (using the default)`);
+  }
+
+  return config;
 }
 
 /**

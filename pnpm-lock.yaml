@@ -71,6 +71,103 @@ importers:
         specifier: 5.0.0
         version: 5.0.0(@types/node@20.4.2)
 
+  packages/constants:
+    devDependencies:
+      '@types/node':
+        specifier: 20.4.2
+        version: 20.4.2
+      typescript:
+        specifier: 5.4.2
+        version: 5.4.2
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@20.4.2)
+
+  packages/contract-clients:
+    dependencies:
+      '@stellar/stellar-sdk':
+        specifier: 16.0.1
+        version: 16.0.1
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:../constants
+      '@yieldanchor/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@yieldanchor/stellar-utils':
+        specifier: workspace:*
+        version: link:../stellar-utils
+      '@yieldanchor/validation':
+        specifier: workspace:*
+        version: link:../validation
+    devDependencies:
+      '@types/node':
+        specifier: 20.4.2
+        version: 20.4.2
+      typescript:
+        specifier: 5.4.2
+        version: 5.4.2
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@20.4.2)
+
+  packages/shared-types:
+    dependencies:
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:../constants
+    devDependencies:
+      '@types/node':
+        specifier: 20.4.2
+        version: 20.4.2
+      typescript:
+        specifier: 5.4.2
+        version: 5.4.2
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@20.4.2)
+
+  packages/stellar-utils:
+    dependencies:
+      '@stellar/stellar-sdk':
+        specifier: 16.0.1
+        version: 16.0.1
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:../constants
+    devDependencies:
+      '@types/node':
+        specifier: 20.4.2
+        version: 20.4.2
+      typescript:
+        specifier: 5.4.2
+        version: 5.4.2
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@20.4.2)
+
+  packages/validation:
+    dependencies:
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:../constants
+      '@yieldanchor/stellar-utils':
+        specifier: workspace:*
+        version: link:../stellar-utils
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@stellar/stellar-sdk':
+        specifier: 16.0.1
+        version: 16.0.1
+      typescript:
+        specifier: 5.4.2
+        version: 5.4.2
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@20.4.2)
+
   services/api:
     dependencies:
       '@stellar/stellar-sdk':
@@ -79,6 +176,12 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.27.0
         version: 2.27.0
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:../../packages/constants
+      '@yieldanchor/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       dotenv:
         specifier: 16.0.3
         version: 16.0.3
@@ -113,6 +216,18 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.27.0
         version: 2.27.0
+      '@yieldanchor/constants':
+        specifier: workspace:*
+        version: link:../../packages/constants
+      '@yieldanchor/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@yieldanchor/stellar-utils':
+        specifier: workspace:*
+        version: link:../../packages/stellar-utils
+      '@yieldanchor/validation':
+        specifier: workspace:*
+        version: link:../../packages/validation
       dotenv:
         specifier: 16.0.3
         version: 16.0.3
@@ -2004,6 +2119,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
 snapshots:
 
   '@alloc/quick-lru@5.3.0': {}
@@ -3795,3 +3913,5 @@ snapshots:
   yaml@2.9.0: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.6.5: {}

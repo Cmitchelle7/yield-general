@@ -1,4 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { DATABASE_TABLES } from '@yieldanchor/constants';
+import type {
+  IndexerCheckpoint,
+  IndexerCheckpointRow,
+} from '@yieldanchor/shared-types';
+import { fromNumericString, toSafeNumber } from '@yieldanchor/stellar-utils';
 
 /**
  * Ingestion cursor persistence.
@@ -8,24 +14,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * what makes resume-after-restart possible.
  */
 
-export interface IndexerCheckpoint {
-  stream: string;
-  cursor: string | null;
-  lastLedger: number;
-}
-
-interface CheckpointRow {
-  stream: string;
-  cursor: string | null;
-  last_ledger: number | string | null;
-}
+export type { IndexerCheckpoint };
 
 export async function loadCheckpoint(
   supabase: SupabaseClient,
   stream: string,
 ): Promise<IndexerCheckpoint | null> {
   const { data, error } = await supabase
-    .from('indexer_checkpoints')
+    .from(DATABASE_TABLES.indexerCheckpoints)
     .select('stream, cursor, last_ledger')
     .eq('stream', stream)
     .maybeSingle();
@@ -37,11 +33,13 @@ export async function loadCheckpoint(
     return null;
   }
 
-  const row = data as CheckpointRow;
+  const row = data as IndexerCheckpointRow;
   return {
     stream: row.stream,
     cursor: row.cursor,
-    lastLedger: Number(row.last_ledger ?? 0),
+    // `last_ledger` comes back as `numeric`; convert exactly and refuse a value
+    // that would not survive the narrowing rather than reporting a wrong ledger.
+    lastLedger: toSafeNumber(fromNumericString(row.last_ledger)) ?? 0,
   };
 }
 
@@ -49,15 +47,17 @@ export async function saveCheckpoint(
   supabase: SupabaseClient,
   checkpoint: IndexerCheckpoint,
 ): Promise<void> {
-  const { error } = await supabase.from('indexer_checkpoints').upsert(
-    {
-      stream: checkpoint.stream,
-      cursor: checkpoint.cursor,
-      last_ledger: checkpoint.lastLedger,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'stream' },
-  );
+  const { error } = await supabase
+    .from(DATABASE_TABLES.indexerCheckpoints)
+    .upsert(
+      {
+        stream: checkpoint.stream,
+        cursor: checkpoint.cursor,
+        last_ledger: checkpoint.lastLedger,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'stream' },
+    );
 
   if (error) {
     throw new Error(

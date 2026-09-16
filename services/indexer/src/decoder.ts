@@ -1,11 +1,27 @@
-import { scValToNative, xdr } from '@stellar/stellar-sdk';
 import type { Api } from '@stellar/stellar-sdk/rpc';
+import { isVaultEventTopic } from '@yieldanchor/constants';
+import type {
+  DecodedVaultEvent,
+  VaultEventType,
+  VaultMetadata,
+} from '@yieldanchor/shared-types';
+import {
+  asBigInt,
+  asItems,
+  asSafeInteger,
+  asString,
+  scValToNativeSafe,
+} from '@yieldanchor/stellar-utils';
 
 /**
  * Decode the Phase 1 `YieldVault` contract's events into a projection-friendly
  * shape.
  *
- * The contract publishes these topics, matching `contracts/yield_vault`:
+ * The topic names, the event types, and the ScVal helpers all come from the
+ * shared packages, so the wire format is defined once and checked against the
+ * contract's source by their tests.
+ *
+ * The contract publishes:
  *
  * | topic | value |
  * | --- | --- |
@@ -23,94 +39,7 @@ import type { Api } from '@stellar/stellar-sdk/rpc';
  * append-only event log.
  */
 
-export const VAULT_EVENT_TYPES = [
-  'initialize',
-  'deposit',
-  'withdraw',
-  'share_mint',
-  'share_burn',
-  'yield',
-  'pause',
-  'unpause',
-] as const;
-
-export type VaultEventType = (typeof VAULT_EVENT_TYPES)[number];
-
-export interface VaultMetadata {
-  contractId: string;
-  admin: string;
-  asset: string;
-  name: string;
-  symbol: string;
-  decimals: number;
-  /** Mirrors `Config.simulation`: always true for the Phase 1 Testnet simulation. */
-  simulatedYield: boolean;
-}
-
-export interface DecodedVaultEvent {
-  eventId: string;
-  vaultId: string;
-  eventType: VaultEventType;
-  userAddress: string | null;
-  /**
-   * For `deposit`/`withdraw` this is the underlying amount moved. For `yield`
-   * it is the crystallized simulated yield, which raises total assets without
-   * a matching token transfer.
-   */
-  assets: bigint | null;
-  shares: bigint | null;
-  ledger: number;
-  txHash: string;
-  ledgerClosedAt: string | null;
-  /** Present only on `initialize`, which creates the vault's metadata row. */
-  vault: VaultMetadata | null;
-}
-
-/** Convert an `ScVal` to native JS, treating hostile or unknown data as absent. */
-function toNative(scv: xdr.ScVal | undefined): unknown {
-  if (!scv) {
-    return null;
-  }
-  try {
-    return scValToNative(scv);
-  } catch {
-    // A malformed or unsupported ScVal must not abort indexing of the batch.
-    return null;
-  }
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-function asBigInt(value: unknown): bigint | null {
-  if (typeof value === 'bigint') {
-    return value;
-  }
-  if (typeof value === 'number' && Number.isSafeInteger(value)) {
-    return BigInt(value);
-  }
-  return null;
-}
-
-function asNumber(value: unknown): number | null {
-  const asInt = asBigInt(value);
-  if (asInt === null) {
-    return null;
-  }
-  const num = Number(asInt);
-  return Number.isSafeInteger(num) ? num : null;
-}
-
-function asItems(value: unknown): unknown[] {
-  return Array.isArray(value) ? (value as unknown[]) : [];
-}
-
-function isVaultEventType(value: string | null): value is VaultEventType {
-  return (
-    value !== null && (VAULT_EVENT_TYPES as readonly string[]).includes(value)
-  );
-}
+export type { DecodedVaultEvent, VaultEventType, VaultMetadata };
 
 /**
  * Decode one RPC event. Returns `null` for anything that is not a recognised
@@ -124,20 +53,20 @@ export function decodeVaultEvent(
     return null;
   }
 
-  const eventType = asString(toNative(event.topic[0]));
-  if (!isVaultEventType(eventType)) {
+  const topic = asString(scValToNativeSafe(event.topic[0]));
+  if (!isVaultEventTopic(topic)) {
     return null;
   }
 
-  const payload = toNative(event.value);
+  const payload = scValToNativeSafe(event.value);
   const userAddress =
-    event.topic.length > 1 ? asString(toNative(event.topic[1])) : null;
+    event.topic.length > 1 ? asString(scValToNativeSafe(event.topic[1])) : null;
 
   let assets: bigint | null = null;
   let shares: bigint | null = null;
   let vault: VaultMetadata | null = null;
 
-  switch (eventType) {
+  switch (topic) {
     case 'deposit':
     case 'withdraw': {
       const [assetsValue, sharesValue] = asItems(payload);
@@ -161,7 +90,7 @@ export function decodeVaultEvent(
       const assetAddress = asString(asset);
       const vaultName = asString(name);
       const vaultSymbol = asString(symbol);
-      const vaultDecimals = asNumber(decimals);
+      const vaultDecimals = asSafeInteger(decimals);
       if (
         !adminAddress ||
         !assetAddress ||
@@ -193,7 +122,7 @@ export function decodeVaultEvent(
   return {
     eventId: event.id,
     vaultId,
-    eventType,
+    eventType: topic,
     userAddress,
     assets,
     shares,

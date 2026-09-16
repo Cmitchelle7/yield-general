@@ -1,22 +1,28 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Server } from '@stellar/stellar-sdk/rpc';
+import {
+  DATABASE_TABLES,
+  INDEXER_DEFAULTS,
+  INDEXER_EVENTS_STREAM,
+} from '@yieldanchor/constants';
+import type { DecodedVaultEvent } from '@yieldanchor/shared-types';
 
 import {
   loadCheckpoint,
   saveCheckpoint,
 } from './checkpoints/checkpoint-store.js';
 import { createSupabaseClient, loadConfig } from './config.js';
-import { decodeVaultEvent, type DecodedVaultEvent } from './decoder.js';
+import { decodeVaultEvent } from './decoder.js';
 import {
   insertVaultEvents,
   upsertVault,
 } from './repositories/vault-repository.js';
 
-const POLL_INTERVAL_MS = 15_000;
-const PAGE_LIMIT = 50;
+const POLL_INTERVAL_MS = INDEXER_DEFAULTS.pollIntervalMs;
+const PAGE_LIMIT = INDEXER_DEFAULTS.pageLimit;
 
 /** Checkpoint stream id for the observed vault's event log. */
-export const EVENTS_STREAM = 'yield_vault_events';
+export const EVENTS_STREAM = INDEXER_EVENTS_STREAM;
 
 /**
  * Persist a decoded batch.
@@ -44,7 +50,7 @@ async function projectEvents(
 async function recordScaffoldSnapshot(supabase: SupabaseClient): Promise<void> {
   const tvl = Math.floor(Math.random() * 10_000_000) / 100;
   const dynamicApy = (5 + Math.random() * 5).toFixed(2);
-  await supabase.from('pool_snapshots').insert([
+  await supabase.from(DATABASE_TABLES.poolSnapshots).insert([
     {
       tvl,
       dynamic_apy: Number(dynamicApy),
@@ -100,7 +106,12 @@ export async function startWatcher(): Promise<void> {
     try {
       const response = await server.getEvents({
         cursor,
-        filters: [{ type: 'contract', contractIds: [config.contractId] }],
+        filters: [
+          {
+            type: INDEXER_DEFAULTS.contractEventType,
+            contractIds: [config.contractId],
+          },
+        ],
         limit: PAGE_LIMIT,
       });
 

@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  I128_MAX,
+  I128_MIN,
+  IntegerRangeError,
+  assertI128,
   fromNumericString,
+  isI128,
+  mulDivTrunc,
   toNumericString,
   toSafeNumber,
-} from '../src/utils/numeric.js';
-
-const I128_MAX = 170141183460469231731687303715884105727n;
-const I128_MIN = -170141183460469231731687303715884105728n;
+} from '../src/index.js';
 
 describe('toNumericString', () => {
   it('stringifies bigints exactly, without float rounding', () => {
@@ -67,5 +70,41 @@ describe('toSafeNumber', () => {
 
   it('returns null for null', () => {
     expect(toSafeNumber(null)).toBeNull();
+  });
+});
+
+describe('isI128 and assertI128', () => {
+  it('accepts the i128 bounds inclusive', () => {
+    expect(isI128(I128_MAX)).toBe(true);
+    expect(isI128(I128_MIN)).toBe(true);
+    expect(isI128(I128_MAX + 1n)).toBe(false);
+    expect(isI128(I128_MIN - 1n)).toBe(false);
+  });
+
+  it('throws a named range error outside the bounds', () => {
+    expect(() => assertI128(I128_MAX + 1n, 'assets')).toThrow(
+      IntegerRangeError,
+    );
+    expect(() => assertI128(I128_MAX + 1n, 'assets')).toThrow(/assets/);
+    expect(assertI128(I128_MAX, 'assets')).toBe(I128_MAX);
+  });
+});
+
+describe('mulDivTrunc', () => {
+  it('keeps full precision for products beyond 2^53', () => {
+    const shares = 170141183460469231731687303715884105727n;
+
+    expect(mulDivTrunc(shares, 1_000_000_000_000_000_000n, 1n)).toBe(
+      shares * 1_000_000_000_000_000_000n,
+    );
+  });
+
+  it('truncates toward zero like Rust integer division', () => {
+    expect(mulDivTrunc(10n, 1n, 3n)).toBe(3n);
+    expect(mulDivTrunc(7n, 1n, 2n)).toBe(3n);
+  });
+
+  it('refuses division by zero instead of returning Infinity', () => {
+    expect(() => mulDivTrunc(1n, 1n, 0n)).toThrow(/Division by zero/);
   });
 });

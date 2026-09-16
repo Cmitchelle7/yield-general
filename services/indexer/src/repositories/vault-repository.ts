@@ -1,7 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-import type { DecodedVaultEvent, VaultMetadata } from '../decoder.js';
-import { toNumericString } from '../utils/numeric.js';
+import { DATABASE_TABLES } from '@yieldanchor/constants';
+import type {
+  DecodedVaultEvent,
+  VaultEventRow,
+  VaultMetadata,
+  VaultRow,
+} from '@yieldanchor/shared-types';
+import { toNumericString } from '@yieldanchor/stellar-utils';
 
 /**
  * Write-side repository for the vault projection.
@@ -10,28 +15,7 @@ import { toNumericString } from '../utils/numeric.js';
  * JavaScript number on its way into a `numeric` column.
  */
 
-export interface VaultRow {
-  contract_id: string;
-  admin: string;
-  asset: string;
-  name: string;
-  symbol: string;
-  decimals: number;
-  simulated_yield: boolean;
-  created_ledger: number;
-}
-
-export interface VaultEventRow {
-  event_id: string;
-  vault_id: string;
-  event_type: string;
-  user_address: string | null;
-  assets: string | null;
-  shares: string | null;
-  ledger: number;
-  tx_hash: string;
-  ledger_closed_at: string | null;
-}
+export type { VaultEventRow, VaultRow };
 
 export function toVaultRow(vault: VaultMetadata, ledger: number): VaultRow {
   return {
@@ -66,7 +50,7 @@ export async function upsertVault(
   ledger: number,
 ): Promise<void> {
   const { error } = await supabase
-    .from('vaults')
+    .from(DATABASE_TABLES.vaults)
     .upsert(toVaultRow(vault, ledger), { onConflict: 'contract_id' });
 
   if (error) {
@@ -91,10 +75,12 @@ export async function insertVaultEvents(
   }
 
   const rows = events.map(toVaultEventRow);
-  const { error } = await supabase.from('vault_events').upsert(rows, {
-    onConflict: 'event_id',
-    ignoreDuplicates: true,
-  });
+  const { error } = await supabase
+    .from(DATABASE_TABLES.vaultEvents)
+    .upsert(rows, {
+      onConflict: 'event_id',
+      ignoreDuplicates: true,
+    });
 
   if (error) {
     throw new Error(

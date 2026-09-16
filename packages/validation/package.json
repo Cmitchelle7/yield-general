@@ -1,0 +1,34 @@
+{
+  "name": "@yieldanchor/validation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zod schemas for Stellar addresses, vault amounts, contract-client inputs, and service environment configuration",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@yieldanchor/constants": "workspace:*",
+    "@yieldanchor/stellar-utils": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@stellar/stellar-sdk": "16.0.1",
+    "typescript": "5.4.2",
+    "vitest": "^3.2.7"
+  }
+}

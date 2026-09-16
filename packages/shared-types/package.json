@@ -1,0 +1,32 @@
+{
+  "name": "@yieldanchor/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared domain types for the YieldVault protocol: config, state, events, database rows, and API DTOs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@yieldanchor/constants": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "20.4.2",
+    "typescript": "5.4.2",
+    "vitest": "^3.2.7"
+  }
+}

@@ -108,10 +108,10 @@ impl YieldVault {
         if env.storage().instance().has(&DataKey::Config) {
             return Err(VaultError::AlreadyInit);
         }
-        if name.len() == 0 || name.len() > 32 {
+        if name.is_empty() || name.len() > 32 {
             return Err(VaultError::BadName);
         }
-        if symbol.len() == 0 || symbol.len() > 32 {
+        if symbol.is_empty() || symbol.len() > 32 {
             return Err(VaultError::BadSymbol);
         }
         if decimals > MAX_DECIMALS {
@@ -312,8 +312,7 @@ impl YieldVault {
 
     pub fn available_liquidity(env: Env) -> Result<i128, VaultError> {
         let config = Self::config(&env)?;
-        Ok(token::TokenClient::new(&env, &config.asset)
-            .balance(&env.current_contract_address()))
+        Ok(token::TokenClient::new(&env, &config.asset).balance(&env.current_contract_address()))
     }
 
     pub fn total_assets(env: Env) -> Result<i128, VaultError> {
@@ -328,10 +327,7 @@ impl YieldVault {
     /// Share price scaled by `PRICE_SCALE` (1e18), rounded down.
     pub fn share_price(env: Env) -> Result<i128, VaultError> {
         let accounting = Self::accounting(&env)?;
-        Self::price_from(
-            Self::total_current(&env, &accounting)?,
-            accounting.shares,
-        )
+        Self::price_from(Self::total_current(&env, &accounting)?, accounting.shares)
     }
 
     pub fn is_paused(env: Env) -> Result<bool, VaultError> {
@@ -417,9 +413,7 @@ impl YieldVault {
             (accounting.principal, accounting.accrued)
         } else {
             let yield_out = Self::mul_div_floor(assets, accounting.accrued, total_assets)?;
-            let principal_out = assets
-                .checked_sub(yield_out)
-                .ok_or(VaultError::Overflow)?;
+            let principal_out = assets.checked_sub(yield_out).ok_or(VaultError::Overflow)?;
             (principal_out, yield_out)
         };
         let original_principal = accounting.principal;
@@ -449,8 +443,7 @@ impl YieldVault {
         Self::sub_shares(env, user, shares)?;
         env.events()
             .publish(("withdraw", user.clone()), (assets, shares));
-        env.events()
-            .publish(("share_burn", user.clone()), shares);
+        env.events().publish(("share_burn", user.clone()), shares);
         Ok(())
     }
 
@@ -478,8 +471,7 @@ impl YieldVault {
         accounting.last_ts = now;
         Self::set_accounting(env, &accounting);
         if yield_amount > 0 {
-            env.events()
-                .publish(("yield",), (yield_amount, now));
+            env.events().publish(("yield",), (yield_amount, now));
         }
         Ok(yield_amount)
     }
@@ -504,7 +496,10 @@ impl YieldVault {
         let rate_elapsed = Self::mul(SIM_APY_BPS, elapsed)?;
         let (whole, base_remainder) = Self::mul_div_parts(principal, rate_elapsed, YIELD_DENOM)?;
         if base_remainder >= YIELD_DENOM - remainder {
-            Ok((Self::add(whole, 1)?, base_remainder - (YIELD_DENOM - remainder)))
+            Ok((
+                Self::add(whole, 1)?,
+                base_remainder - (YIELD_DENOM - remainder),
+            ))
         } else {
             Ok((whole, Self::add(base_remainder, remainder)?))
         }
@@ -945,14 +940,8 @@ mod test {
             client.try_deposit(&alice, &100),
             Err(Ok(VaultError::Paused))
         );
-        assert_eq!(
-            client.try_redeem(&alice, &1),
-            Err(Ok(VaultError::Paused))
-        );
-        assert_eq!(
-            client.try_accrue_yield(),
-            Err(Ok(VaultError::Paused))
-        );
+        assert_eq!(client.try_redeem(&alice, &1), Err(Ok(VaultError::Paused)));
+        assert_eq!(client.try_accrue_yield(), Err(Ok(VaultError::Paused)));
         client.unpause();
         assert_eq!(client.try_unpause(), Err(Ok(VaultError::NotPaused)));
         assert!(!client.is_paused());

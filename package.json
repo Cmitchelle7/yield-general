@@ -2,7 +2,11 @@
   "name": "yieldanchor-protocol",
   "version": "0.1.0",
   "private": true,
+  "description": "YieldAnchor Protocol — Stellar/Soroban RWA yield infrastructure monorepo",
   "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
   "pnpm": {
     "overrides": {
       "browserslist": "4.28.2",
@@ -14,10 +18,30 @@
     "build:web": "pnpm --filter @yieldanchor/web build",
     "build:api": "pnpm --filter @yieldanchor/api build",
     "build:indexer": "pnpm --filter @yieldanchor/indexer build",
-    "typecheck": "pnpm run build:web && pnpm run build:api && pnpm run build:indexer",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm run contract:test",
     "dev:web": "pnpm --filter @yieldanchor/web dev",
     "dev:api": "pnpm --filter @yieldanchor/api dev",
     "dev:indexer": "pnpm --filter @yieldanchor/indexer dev",
-    "contract:build": "cargo build --manifest-path contracts/yield_vault/Cargo.toml --target wasm32-unknown-unknown --release"
+    "clean": "rm -rf node_modules apps/*/node_modules services/*/node_modules packages/*/node_modules apps/*/dist services/*/dist",
+    "contract:build": "cargo build --manifest-path contracts/yield_vault/Cargo.toml --target wasm32-unknown-unknown --release",
+    "contract:check": "cargo check -p yield_vault",
+    "contract:test": "cargo test -p yield_vault",
+    "contract:fmt": "cargo fmt --all",
+    "contract:fmt:check": "cargo fmt --all -- --check",
+    "contract:clippy": "cargo clippy -p yield_vault --all-targets -- -D warnings",
+    "contract:deploy": "bash scripts/deploy/deploy-yield-vault.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "5.4.2",
+    "typescript-eslint": "^8.70.0"
   }
 }

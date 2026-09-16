@@ -13,9 +13,5 @@ soroban-sdk = "21.7"
 [dev-dependencies]
 soroban-sdk = { version = "21.7", features = ["testutils"] }
 
-[profile.release]
-opt-level = "z"
-overflow-checks = true
-lto = true
-codegen-units = 1
-strip = true
+# The release profile lives in the workspace-root Cargo.toml: Cargo ignores
+# [profile.*] tables declared in a workspace member.

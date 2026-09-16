@@ -9,9 +9,15 @@ const router = express.Router();
 // Check if Supabase is configured
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-const supabaseConfigured = supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_key_here';
+const supabaseConfigured =
+  supabaseUrl &&
+  supabaseKey &&
+  supabaseUrl !== 'your_supabase_url_here' &&
+  supabaseKey !== 'your_supabase_key_here';
 
-const supabase = supabaseConfigured ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = supabaseConfigured
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 router.get('/:address', async (req, res) => {
   const address = req.params.address;
@@ -23,7 +29,7 @@ router.get('/:address', async (req, res) => {
       user_address: address,
       amount: 100 + Math.random() * 1000,
       type: i % 2 === 0 ? 'deposit' : 'withdraw',
-      timestamp: new Date(Date.now() - i * 86400000).toISOString()
+      timestamp: new Date(Date.now() - i * 86400000).toISOString(),
     }));
     return res.json(mockData);
   }

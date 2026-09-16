@@ -3,3 +3,13 @@ members = [
   "contracts/yield_vault"
 ]
 resolver = "2"
+
+# Cargo only honours profiles declared at the workspace root; the same table in a
+# member manifest is ignored. Keep the Soroban release profile here so the
+# contract wasm is actually built with it.
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+lto = true
+codegen-units = 1
+strip = true

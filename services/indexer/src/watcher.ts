@@ -4,7 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
-const RPC_URL = process.env.SOROBAN_RPC || 'https://soroban-testnet.stellar.org:443';
+const RPC_URL =
+  process.env.SOROBAN_RPC || 'https://soroban-testnet.stellar.org:443';
 const CONTRACT_ID = process.env.CONTRACT_ID || '';
 
 // This is the existing scaffold poller; production checkpointing and decoding remain planned.
@@ -23,7 +24,9 @@ const server = new Server(RPC_URL);
 export async function startWatcher() {
   console.log('Starting event poller for contract events...');
   if (!supabaseConfigured) {
-    console.log('Supabase not configured; persistence is disabled for the scaffold.');
+    console.log(
+      'Supabase not configured; persistence is disabled for the scaffold.',
+    );
   }
 
   setInterval(async () => {
@@ -46,11 +49,21 @@ export async function startWatcher() {
         if (supabaseConfigured && supabase) {
           if (String(type) === 'deposit') {
             await supabase.from('transaction_logs').insert([
-              { user_address: userAddr, action_type: 'deposit', amount, timestamp },
+              {
+                user_address: userAddr,
+                action_type: 'deposit',
+                amount,
+                timestamp,
+              },
             ]);
           } else if (String(type) === 'withdraw') {
             await supabase.from('transaction_logs').insert([
-              { user_address: userAddr, action_type: 'withdraw', amount, timestamp },
+              {
+                user_address: userAddr,
+                action_type: 'withdraw',
+                amount,
+                timestamp,
+              },
             ]);
           }
         }
@@ -61,7 +74,11 @@ export async function startWatcher() {
       const dynamicApy = (5 + Math.random() * 5).toFixed(2);
       if (supabaseConfigured && supabase) {
         await supabase.from('pool_snapshots').insert([
-          { tvl, dynamic_apy: Number(dynamicApy), timestamp: new Date().toISOString() },
+          {
+            tvl,
+            dynamic_apy: Number(dynamicApy),
+            timestamp: new Date().toISOString(),
+          },
         ]);
       }
     } catch (error) {

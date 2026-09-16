@@ -9,9 +9,15 @@ const router = express.Router();
 // Check if Supabase is configured
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-const supabaseConfigured = supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_key_here';
+const supabaseConfigured =
+  supabaseUrl &&
+  supabaseKey &&
+  supabaseUrl !== 'your_supabase_url_here' &&
+  supabaseKey !== 'your_supabase_key_here';
 
-const supabase = supabaseConfigured ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = supabaseConfigured
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 router.get('/', async (req, res) => {
   if (!supabaseConfigured || !supabase) {
@@ -20,14 +26,14 @@ router.get('/', async (req, res) => {
       id: 1,
       tvl: 1240500,
       dynamic_apy: 8.75,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     const mockHistory = Array.from({ length: 10 }, (_, i) => ({
       id: i + 1,
       tvl: 1200000 + Math.random() * 100000,
       dynamic_apy: 8.5 + Math.random() * 0.5,
-      timestamp: new Date(Date.now() - i * 3600000).toISOString()
+      timestamp: new Date(Date.now() - i * 3600000).toISOString(),
     }));
 
     return res.json({ latest: mockLatest, history: mockHistory });

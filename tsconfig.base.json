@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "YieldAnchor base configuration",
+  "//": "Shared TypeScript settings for apps/ and services/. Each workspace extends this file and declares only its own target, module system, and output directory.",
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

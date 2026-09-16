@@ -1,14 +1,12 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "moduleDetection": "force",
     "target": "ES2020",
     "module": "NodeNext",
-    "outDir": "dist",
-    "rootDir": "src",
-    "strict": true,
     "moduleResolution": "nodenext",
-    "esModuleInterop": true,
-    "skipLibCheck": true
+    "outDir": "dist",
+    "rootDir": "src"
   },
   "include": ["src"]
 }

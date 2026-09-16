@@ -1,7 +1,13 @@
+# Environment files (never commit real values; .env.example is the template)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+!.env.example
+
 # Rust
-/target/
 **/target/
-Cargo.lock
 *.rs.bk
 
 # Node
@@ -12,8 +18,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 package-lock.json
-pnpm-lock.yaml
 .yarn/
+
+# Lockfiles are committed: pnpm-lock.yaml pins the workspace,
+# contracts/yield_vault/Cargo.lock pins the Soroban contract build.
 
 # VS Code
 .vscode/
@@ -29,6 +37,10 @@ pnpm-lock.yaml
 **/dist/
 /build/
 **/build/
+*.tsbuildinfo
+
+# Tooling caches
+.eslintcache
 
 # Temporary files
 *.tmp
@@ -37,6 +49,3 @@ pnpm-lock.yaml
 *.swo
 *.bak
 ~*
-
-# Ignore generated package inspection files if added accidentally
-npm-package-inspect/package/

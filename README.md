@@ -224,10 +224,15 @@ yieldanchor/
 │   ├── security/
 │   └── rwa/
 ├── .env.example
-├── Makefile
-├── Cargo.toml
-├── package.json
+├── .prettierignore
+├── .prettierrc.json
+├── Cargo.lock                  # pinned Soroban contract dependency graph
+├── Cargo.toml                  # Rust workspace root (contracts only)
+├── Makefile                    # Rust/Soroban automation only
+├── eslint.config.mjs           # ESLint flat config for TS/JS
+├── package.json                # pnpm workspace scripts
 ├── pnpm-workspace.yaml
+├── tsconfig.base.json          # Shared TypeScript base config
 └── README.md
 ```
 
@@ -241,6 +246,8 @@ yieldanchor/
 - PostgreSQL/Supabase as the planned derived data store
 - Freighter Wallet for user authorization
 - pnpm workspaces for JavaScript package boundaries
+- ESLint (flat config, TypeScript support) and Prettier for the TypeScript/JavaScript workspaces
+- rustfmt and clippy for Rust; Prettier never formats Rust sources
 
 The repository currently uses the pinned dependency versions in each application and service package. Shared packages do not have runtime implementations yet.
 
@@ -292,10 +299,9 @@ No current scaffold should be used with production funds or interpreted as an in
 
 Prerequisites:
 
-- Node.js compatible with the pinned TypeScript and tooling versions.
-- pnpm.
+- Node.js `>=20` and pnpm (the workspace pins `pnpm@9.15.0` through `packageManager`).
 - Rust and the `wasm32-unknown-unknown` target for contract work.
-- Optional: Stellar CLI for testnet contract development.
+- Optional: Stellar CLI for Testnet contract development.
 - Optional: Supabase credentials for the existing persistence scaffold.
 
 Setup:
@@ -306,6 +312,17 @@ pnpm install
 pnpm run typecheck
 ```
 
+The daily workflow is driven by `pnpm` from the repository root. `pnpm run` lists every
+available script.
+
+```bash
+pnpm run build        # typecheck + bundle apps/web, compile services/api and services/indexer
+pnpm run typecheck    # tsc --noEmit in every TypeScript workspace
+pnpm run lint         # ESLint over the TypeScript/JavaScript workspaces
+pnpm run format       # Prettier write
+pnpm run format:check # Prettier check (use in CI)
+```
+
 Run individual development processes from the repository root:
 
 ```bash
@@ -314,7 +331,46 @@ pnpm run dev:api
 pnpm run dev:indexer
 ```
 
-Run the Phase 1 contract checks with `cargo fmt --all -- --check`, `cargo check -p yield_vault`, `cargo test -p yield_vault`, and `cargo clippy -p yield_vault --all-targets -- -D warnings`. Build with `make contract-build`. The deployment script under `scripts/deploy` is a Testnet-only development aid and initializes the Phase 1 metadata; it must be reviewed before any use.
+### Command mapping
+
+The former Makefile wrapped pnpm and contained no Rust automation, so its commands
+now live in `package.json`. The Makefile is retained only for Rust/Soroban targets.
+
+| Old command           | New equivalent                                       |
+| --------------------- | ---------------------------------------------------- |
+| `make install`        | `pnpm install`                                       |
+| `make build`          | `pnpm run build`                                     |
+| `make typecheck`      | `pnpm run typecheck`                                 |
+| `make dev-web`        | `pnpm run dev:web`                                   |
+| `make dev-api`        | `pnpm run dev:api`                                   |
+| `make dev-indexer`    | `pnpm run dev:indexer`                               |
+| `make contract-build` | `pnpm run contract:build` (or `make contract-build`) |
+
+### Rust and Soroban
+
+The contract crate remains Rust + Soroban/Wasm under `contracts/`; it was not
+migrated to TypeScript. The repository root is the Cargo workspace root, so
+`target/` and `Cargo.lock` belong there and `[profile.release]` must be declared in
+the root `Cargo.toml` — Cargo ignores that table when it appears in a workspace
+member.
+
+`make help` lists the Rust-only targets, which are equivalent to the `contract:*`
+scripts in `package.json`:
+
+```bash
+make contract-build       # cargo build --release --target wasm32-unknown-unknown
+make contract-check       # cargo check -p yield_vault
+make contract-test        # cargo test -p yield_vault
+make contract-fmt         # cargo fmt --all
+make contract-fmt-check   # cargo fmt --all -- --check
+make contract-clippy      # cargo clippy -p yield_vault --all-targets -- -D warnings
+make clean                # cargo clean
+```
+
+Rust formatting and linting are owned by rustfmt and clippy; Prettier and ESLint
+do not format or lint `contracts/`. The deployment script under `scripts/deploy` is
+a Testnet-only development aid and initializes the Phase 1 metadata; it must be
+reviewed before any use.
 
 ## Contribution Guidelines
 
@@ -325,6 +381,9 @@ Run the Phase 1 contract checks with `cargo fmt --all -- --check`, `cargo check 
 - Avoid storing secrets in the repository; update `.env.example` when configuration changes.
 - Treat contract, compliance, financial, and RWA changes as requiring design review before implementation.
 - Prefer small, reviewable changes that preserve existing working behavior.
+- Before opening a change, run `pnpm run lint`, `pnpm run format:check`, and
+  `pnpm run typecheck`, plus the Rust checks (`make contract-fmt-check`,
+  `make contract-clippy`, `make contract-test`) when contracts are touched.
 
 ## License
 

@@ -491,11 +491,11 @@ export default function App() {
                   }}
                 >
                   • [LIVE] US 3-Month Treasury Token (yUST3M): Yield holds at
-                  5.24% APR • [MARKET MOVE] BlackRock BUIDL fund surpasses
-                  $500M in tokenized volume • [FED WATCH] Interest rates held
-                  steady; yield demand shifts to on-chain RWA anchors •
-                  [COMPLIANCE] Tokenized Euro Sovereign Debt pool initialized
-                  for YieldAnchor tier-1 liquidity •
+                  5.24% APR • [MARKET MOVE] BlackRock BUIDL fund surpasses $500M
+                  in tokenized volume • [FED WATCH] Interest rates held steady;
+                  yield demand shifts to on-chain RWA anchors • [COMPLIANCE]
+                  Tokenized Euro Sovereign Debt pool initialized for YieldAnchor
+                  tier-1 liquidity •
                 </span>
               </div>
             </div>
